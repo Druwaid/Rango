@@ -9,6 +9,7 @@ from rango.forms import UserForm, UserProfileForm
 from django.core.urlresolvers import reverse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
+from datetime import datetime
 
 
 def show_category(request, category_name_slug):
@@ -71,8 +72,12 @@ def index(request):
     page_list = Page.objects.order_by('-views')[:5]
     context_dict = {'categories': category_list, 'pages': page_list}
 
+    visitor_cookie_handler(request)
+    context_dict['visits'] = request.session['visits']
     # Render the response and send it back!
-    return render(request, 'rango/index.html', context_dict)
+    response = render(request, 'rango/index.html', context_dict)
+    visitor_cookie_handler(request)
+    return response
     
 
 def about(request):
@@ -139,3 +144,26 @@ def user_logout(request):
 @login_required
 def restricted(request):
     return HttpResponse("Since you're logged in, you can see this text!")
+
+def visitor_cookie_handler(request):
+
+    vists = int(get_server_side_cookie(request, 'visits', '1'))
+    last_visit_cookie = get_server_side_cookie(request,
+                                               'last_visit',
+                                                str(datetime.now()))
+    last_visit_time = datetime.strptime(last_visit_cookie[:-7],
+                                        '%Y-%m-%d %H:%M:%S')
+    if(datetime.now() - last_visit_time).days > 0:
+        visits = visits + 1
+        request.session['last_visit'] = str(datetime.now())
+    else:
+        visits = 1
+        request.session['last_visit'] = last_visit_cookie
+    request.session['visits'] = visits
+
+
+def get_server_side_cookie(request, cookie, default_val=None):
+    val = request.session.get(cookie)
+    if not val:
+        val = default_val
+    return val
